@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { Router } from "express";
 import { desc, eq } from "drizzle-orm";
 import { policyIntelDb } from "./db";
@@ -89,7 +88,7 @@ export function createPolicyIntelRouter() {
   router.get("/watchlists/:id", async (req, res, next) => {
     try {
       const id = Number(req.params.id);
-      const [watchlist] = await policyIntelDb.select().from(watchlists).$dynamic().where(eq(watchlists.id, id));
+      const [watchlist] = await policyIntelDb.select().from(watchlists).where(eq(watchlists.id, id));
       if (!watchlist) {
         return res.status(404).json({ message: "watchlist not found" });
       }
@@ -161,31 +160,44 @@ export function createPolicyIntelRouter() {
         sourceDocumentId,
         title,
         summary,
+        // Accept friendly input names; map to actual schema columns below
         severity = "info",
-        status = "new",
+        status = "pending_review",
         alertReason,
         metadataJson,
       } = req.body ?? {};
 
       if (!workspaceId || !watchlistId || !sourceDocumentId || !title) {
         return res.status(400).json({
-          message:
-            "workspaceId, watchlistId, sourceDocumentId, and title are required",
+          message: "workspaceId, watchlistId, sourceDocumentId, and title are required",
         });
       }
+
+      // Map severity string → relevanceScore integer
+      const severityScoreMap: Record<string, number> = {
+        high: 80, medium: 50, low: 20, info: 0,
+      };
+      const relevanceScore = severityScoreMap[severity as string] ?? 0;
+
+      // status must be a valid alertStatusEnum value
+      const validStatuses = ["pending_review", "ready", "sent", "suppressed"] as const;
+      type AlertStatus = typeof validStatuses[number];
+      const resolvedStatus: AlertStatus = validStatuses.includes(status as AlertStatus)
+        ? (status as AlertStatus)
+        : "pending_review";
 
       const [created] = await policyIntelDb
         .insert(alerts)
         .values({
-          workspaceId,
-          watchlistId,
-          sourceDocumentId,
+          workspaceId: Number(workspaceId),
+          watchlistId: Number(watchlistId),
+          sourceDocumentId: Number(sourceDocumentId),
           title,
           summary,
-          severity,
-          status,
-          alertReason,
-          metadataJson: metadataJson ?? {},
+          whyItMatters: alertReason ?? null,
+          status: resolvedStatus,
+          relevanceScore,
+          reasonsJson: metadataJson ? [JSON.stringify(metadataJson)] : [],
         })
         .returning();
 
