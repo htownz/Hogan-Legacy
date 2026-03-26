@@ -8,6 +8,7 @@ import { processDocumentAlerts } from "./services/alert-service";
 import { generateBrief } from "./services/brief-service";
 import { upsertStakeholder, addObservation, getStakeholderWithObservations, getStakeholdersForMatter } from "./services/stakeholder-service";
 import { fetchTecData } from "./connectors/texas/tec-filings";
+import { runLocalFeedsJob } from "./jobs/run-local-feeds";
 
 export function createPolicyIntelRouter() {
   const router = Router();
@@ -31,7 +32,8 @@ export function createPolicyIntelRouter() {
         "/api/intel/matters",
         "/api/intel/activities",
         "/api/intel/stakeholders",
-        "/api/intel/jobs"
+        "/api/intel/jobs",
+        "/api/intel/jobs/run-local-feeds"
       ]
     });
   });
@@ -522,6 +524,18 @@ export function createPolicyIntelRouter() {
       }
       const result = await fetchTecData(searchTerm);
       res.json(result);
+    } catch (err: any) {
+      next(err);
+    }
+  });
+
+  // ── Local Feeds ───────────────────────────────────────────────────────────
+
+  router.post("/jobs/run-local-feeds", async (_req, res, next) => {
+    try {
+      const result = await runLocalFeedsJob();
+      const status = result.feedErrors.length === result.feedsAttempted ? 500 : 200;
+      res.status(status).json(result);
     } catch (err: any) {
       next(err);
     }

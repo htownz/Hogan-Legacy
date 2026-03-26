@@ -19,6 +19,7 @@ export const sourceTypeEnum = pgEnum("policy_intel_source_type", [
   "texas_legislation",
   "texas_regulation",
   "texas_ethics",
+  "texas_local",
   "manual",
 ]);
 
