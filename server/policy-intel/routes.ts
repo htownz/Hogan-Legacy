@@ -1,10 +1,11 @@
 import { Router } from "express";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { policyIntelDb } from "./db";
-import { activities, alerts, briefs, matters, matterWatchlists, monitoringJobs, sourceDocuments, watchlists, workspaces } from "@shared/schema-policy-intel";
+import { activities, alerts, briefs, deliverables, matters, matterWatchlists, monitoringJobs, sourceDocuments, watchlists, workspaces } from "@shared/schema-policy-intel";
 import { seedGraceMcEwan } from "./seed/grace-mcewan";
 import { runTloRssJob } from "./jobs/run-tlo-rss";
 import { processDocumentAlerts } from "./services/alert-service";
+import { generateBrief } from "./services/brief-service";
 
 export function createPolicyIntelRouter() {
   const router = Router();
@@ -23,6 +24,8 @@ export function createPolicyIntelRouter() {
         "/api/intel/source-documents",
         "/api/intel/alerts",
         "/api/intel/briefs",
+        "/api/intel/briefs/generate",
+        "/api/intel/deliverables",
         "/api/intel/matters",
         "/api/intel/activities",
         "/api/intel/jobs"
@@ -224,6 +227,49 @@ export function createPolicyIntelRouter() {
   router.get("/briefs", async (_req, res, next) => {
     try {
       const rows = await policyIntelDb.select().from(briefs).orderBy(desc(briefs.id));
+      res.json(rows);
+    } catch (err: any) {
+      next(err);
+    }
+  });
+
+  router.post("/briefs/generate", async (req, res, next) => {
+    try {
+      const { workspaceId, watchlistId, matterId, sourceDocumentIds, title } = req.body ?? {};
+      if (!workspaceId || !sourceDocumentIds || !Array.isArray(sourceDocumentIds) || sourceDocumentIds.length === 0) {
+        return res.status(400).json({ message: "workspaceId and non-empty sourceDocumentIds[] are required — no sources, no brief" });
+      }
+      const result = await generateBrief({
+        workspaceId: Number(workspaceId),
+        watchlistId: watchlistId ? Number(watchlistId) : undefined,
+        matterId: matterId ? Number(matterId) : undefined,
+        sourceDocumentIds: sourceDocumentIds.map(Number),
+        title,
+      });
+      res.status(201).json(result);
+    } catch (err: any) {
+      next(err);
+    }
+  });
+
+  router.get("/deliverables", async (_req, res, next) => {
+    try {
+      const rows = await policyIntelDb.select().from(deliverables).orderBy(desc(deliverables.id));
+      res.json(rows);
+    } catch (err: any) {
+      next(err);
+    }
+  });
+
+  // Briefs for a specific matter (via deliverables)
+  router.get("/matters/:id/briefs", async (req, res, next) => {
+    try {
+      const matterId = Number(req.params.id);
+      const rows = await policyIntelDb
+        .select()
+        .from(deliverables)
+        .where(eq(deliverables.matterId, matterId))
+        .orderBy(desc(deliverables.id));
       res.json(rows);
     } catch (err: any) {
       next(err);

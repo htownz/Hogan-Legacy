@@ -35,6 +35,13 @@ export const briefStatusEnum = pgEnum("policy_intel_brief_status", [
   "published",
 ]);
 
+export const deliverableTypeEnum = pgEnum("policy_intel_deliverable_type", [
+  "issue_brief",
+  "hearing_memo",
+  "client_alert",
+  "weekly_digest",
+]);
+
 export const matterStatusEnum = pgEnum("policy_intel_matter_status", [
   "active",
   "watching",
@@ -187,6 +194,23 @@ export const activities = pgTable("policy_intel_activities", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+// ── Phase 4: Deliverables ───────────────────────────────────────────────────
+
+export const deliverables = pgTable("policy_intel_deliverables", {
+  id: serial("id").primaryKey(),
+  workspaceId: integer("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  briefId: integer("brief_id").references(() => briefs.id, { onDelete: "set null" }),
+  matterId: integer("matter_id").references(() => matters.id, { onDelete: "set null" }),
+  type: deliverableTypeEnum("type").notNull().default("issue_brief"),
+  title: text("title").notNull(),
+  bodyMarkdown: text("body_markdown").notNull(),
+  sourceDocumentIds: jsonb("source_document_ids").$type<number[]>().notNull().default([]),
+  citationsJson: jsonb("citations_json").$type<Record<string, unknown>[]>().notNull().default([]),
+  generatedBy: varchar("generated_by", { length: 64 }).notNull().default("template"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 export type PolicyIntelWorkspace = typeof workspaces.$inferSelect;
 export type InsertPolicyIntelWorkspace = typeof workspaces.$inferInsert;
 export type PolicyIntelWatchlist = typeof watchlists.$inferSelect;
@@ -205,3 +229,5 @@ export type PolicyIntelMatterWatchlist = typeof matterWatchlists.$inferSelect;
 export type InsertPolicyIntelMatterWatchlist = typeof matterWatchlists.$inferInsert;
 export type PolicyIntelActivity = typeof activities.$inferSelect;
 export type InsertPolicyIntelActivity = typeof activities.$inferInsert;
+export type PolicyIntelDeliverable = typeof deliverables.$inferSelect;
+export type InsertPolicyIntelDeliverable = typeof deliverables.$inferInsert;
