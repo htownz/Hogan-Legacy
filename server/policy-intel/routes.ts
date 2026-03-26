@@ -2,6 +2,8 @@ import { Router } from "express";
 import { desc, eq } from "drizzle-orm";
 import { policyIntelDb } from "./db";
 import { alerts, briefs, monitoringJobs, sourceDocuments, watchlists, workspaces } from "@shared/schema-policy-intel";
+import { seedGraceMcEwan } from "./seed/grace-mcewan";
+import { runTloRssJob } from "./jobs/run-tlo-rss";
 
 export function createPolicyIntelRouter() {
   const router = Router();
@@ -229,6 +231,32 @@ export function createPolicyIntelRouter() {
     try {
       const rows = await policyIntelDb.select().from(monitoringJobs).orderBy(desc(monitoringJobs.id));
       res.json(rows);
+    } catch (err: any) {
+      next(err);
+    }
+  });
+
+  // ── Dev-only: seed Grace & McEwan workspace + watchlists ──────────────────
+  router.post("/seed", async (_req, res, next) => {
+    try {
+      const result = await seedGraceMcEwan();
+      res.status(200).json({
+        message: "Grace & McEwan workspace seeded",
+        workspaceId: result.workspace.id,
+        watchlistIds: result.watchlistIds,
+      });
+    } catch (err: any) {
+      next(err);
+    }
+  });
+
+  // ── Job triggers ──────────────────────────────────────────────────────────
+
+  router.post("/jobs/run-tlo-rss", async (_req, res, next) => {
+    try {
+      const result = await runTloRssJob();
+      const status = result.feedErrors.length === result.feedsAttempted ? 500 : 200;
+      res.status(status).json(result);
     } catch (err: any) {
       next(err);
     }

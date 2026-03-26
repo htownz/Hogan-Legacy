@@ -47,20 +47,68 @@ npm run dev:policy-intel
 - A clean schema in `shared/schema-policy-intel.ts`
 - Core tables for workspaces, watchlists, source documents, alerts, briefs, and jobs
 - Basic API endpoints under `/api/intel/*`
+- Grace & McEwan workspace + 3 starter watchlists (seed script)
+- TLO RSS connector (`connectors/texas/tlo-rss.ts`) — fetches FiledBills, ScheduledHearings, BillHistory
+- Checksum-based deduplication engine (`engine/checksum.ts` + `services/source-document-service.ts`)
+- Manual job trigger: `POST /api/intel/jobs/run-tlo-rss`
+
+## Seed the Grace & McEwan workspace
+
+After the schema push, seed the firm workspace and its three starter watchlists:
+
+```bash
+curl -X POST http://localhost:5050/api/intel/seed
+```
+
+Expected response:
+```json
+{
+  "message": "Grace & McEwan workspace seeded",
+  "workspaceId": 1,
+  "watchlistIds": [1, 2, 3]
+}
+```
+
+Verify:
+```bash
+curl http://localhost:5050/api/intel/watchlists
+```
+
+## Run the TLO RSS ingest job
+
+Manually trigger the Texas Legislature Online RSS connector:
+
+```bash
+curl -X POST http://localhost:5050/api/intel/jobs/run-tlo-rss
+```
+
+Expected response (shape):
+```json
+{
+  "feedsAttempted": 3,
+  "feedErrors": [],
+  "totalFetched": 45,
+  "inserted": 45,
+  "skipped": 0,
+  "errors": []
+}
+```
+
+Run it a second time — `inserted` should be 0 and `skipped` should match the previous `inserted` count
+(checksum deduplication is working correctly).
 
 ## What to build next
 
-1. Add source connectors:
-   - Congress.gov
-   - GovInfo
-   - Regulations.gov
-   - Texas Legislature Online
-   - Texas Register / TAC
-   - Texas Ethics Commission
-2. Build evidence ingestion into `policy_intel_source_documents`
-3. Add watchlist matching and alert reason generation
-4. Add brief generation from stored evidence only
-5. Add a lightweight React workspace for watchlists, alerts, dossiers, and briefs
+- [x] Seed Grace & McEwan workspace + watchlists
+- [x] TLO RSS connector (FiledBills, ScheduledHearings, BillHistory)
+- [x] Checksum deduplication engine
+- [ ] Phase 2: watchlist matching engine + alert generation
+- [ ] Phase 3: matters + activities schema
+- [ ] Phase 4: brief generation (Anthropic Claude, evidence-backed)
+- [ ] Phase 5: stakeholder intelligence (TEC connector)
+- [ ] Phase 6: Houston/Harris County/METRO local overlay
+- [ ] Phase 7: decision kernel hardening + reviewer feedback loop
+- [ ] Phase 8: minimal internal React UI
 
 ## Suggested first story
 
